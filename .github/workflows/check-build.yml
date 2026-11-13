@@ -5,6 +5,7 @@ on:
 
 permissions:
   contents: read
+  pages: write
 
 jobs:
   build:
@@ -39,6 +40,31 @@ jobs:
           grep -q "C-Eval" _site/index.html
           grep -q "Composing Parameter-Efficient Modules with Arithmetic Operations" _site/index.html
           echo "Homepage checks passed"
+      - name: Check every publication is listed on the about page and the publications page
+        run: |
+          set -e
+          python - <<'PY'
+          import re
+          titles = [
+              "SynLogic",
+              "On the Perception Bottleneck of VLMs for Chart Understanding",
+              "On the Universal Truthfulness Hyperplane Inside LLMs",
+              "In-Context Sharpness as Alerts",
+              "C-Eval",
+              "Composing Parameter-Efficient Modules with Arithmetic Operations",
+          ]
+          for path in ["_site/index.html", "_site/publications/index.html"]:
+              html = open(path, encoding="utf-8").read()
+              for title in titles:
+                  assert title in html, (path, title)
+              print(path, "contains all six publications")
+          html = open("_site/publications/index.html", encoding="utf-8").read()
+          entries = re.findall(r'<h2 class="archive__item-title"[^>]*>(.*?)</h2>', html, re.S)
+          print("Publication listing order:", len(entries))
+          for entry in entries:
+              print(" -", re.sub(r"<[^>]+>", "", entry).strip())
+          assert len(entries) == 6, entries
+          PY
       - name: Check publication pages
         run: |
           set -e
@@ -48,7 +74,6 @@ jobs:
           test -f _site/publication/2024-in-context-sharpness/index.html
           test -f _site/publication/2023-ceval/index.html
           test -f _site/publication/2023-composing-parameter-efficient-modules/index.html
-          grep -c 'class="archive__item"' _site/publications/index.html
           echo "Publication checks passed"
       - name: Check that no template placeholder content remains in the built pages
         run: |
@@ -58,3 +83,13 @@ jobs:
             exit 1
           fi
           echo "No placeholder content found"
+      - name: Enable GitHub Pages with workflow builds if not already configured
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api repos/${{ github.repository }}/pages >/dev/null 2>&1; then
+            echo "GitHub Pages is already configured"
+          else
+            gh api -X POST repos/${{ github.repository }}/pages -f build_type=workflow
+          fi
