@@ -1,0 +1,60 @@
+name: Check site build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.1'
+          bundler-cache: true
+      - name: Minify JavaScript
+        run: |
+          npm install -g uglify-js
+          uglifyjs assets/js/plugins/jquery.greedy-navigation.js assets/js/_main.js assets/js/theme.js -c -m -o assets/js/main.min.js
+      - name: Build site
+        run: bundle exec jekyll build --baseurl "/LJT-Homepage"
+        env:
+          JEKYLL_ENV: production
+      - name: Check homepage content
+        run: |
+          set -e
+          test -f _site/index.html
+          test -f _site/publications/index.html
+          grep -q "Junteng Liu" _site/index.html
+          grep -q "jliugi@connect.ust.hk" _site/index.html
+          grep -q "Shanghai Jiao Tong University" _site/index.html
+          grep -q "MINIMAX" _site/index.html
+          grep -q "SynLogic" _site/index.html
+          grep -q "On the Perception Bottleneck of VLMs for Chart Understanding" _site/index.html
+          grep -q "On the Universal Truthfulness Hyperplane Inside LLMs" _site/index.html
+          grep -q "In-Context Sharpness as Alerts" _site/index.html
+          grep -q "C-Eval" _site/index.html
+          grep -q "Composing Parameter-Efficient Modules with Arithmetic Operations" _site/index.html
+          echo "Homepage checks passed"
+      - name: Check publication pages
+        run: |
+          set -e
+          test -f _site/publication/2025-synlogic/index.html
+          test -f _site/publication/2025-perception-bottleneck/index.html
+          test -f _site/publication/2024-universal-truthfulness-hyperplane/index.html
+          test -f _site/publication/2024-in-context-sharpness/index.html
+          test -f _site/publication/2023-ceval/index.html
+          test -f _site/publication/2023-composing-parameter-efficient-modules/index.html
+          grep -c 'class="archive__item"' _site/publications/index.html
+          echo "Publication checks passed"
+      - name: Check that no template placeholder content remains in the built pages
+        run: |
+          set -e
+          if grep -R -l -E "Paper Title Number|Your Name|GitHub University|Red Brick University" _site --include='*.html'; then
+            echo "Placeholder content found"
+            exit 1
+          fi
+          echo "No placeholder content found"
